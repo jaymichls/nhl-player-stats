@@ -1,10 +1,13 @@
 import React, { Component } from "react";
 import axios from "axios";
 import ReactTable from "react-table";
+import checkboxHOC from "react-table/lib/hoc/selectTable";
+
 import "react-table/react-table.css";
 
 import Tabs from "@material-ui/core/Tabs";
 import Tab from "@material-ui/core/Tab";
+const CheckboxTable = checkboxHOC(ReactTable);
 
 function desc(a, b, orderBy) {
   if (b[orderBy] < a[orderBy]) {
@@ -22,29 +25,30 @@ class App extends Component {
 
     this.state = {
       activeTab: 0,
-      skaters: [],
-      goalies: []
+      players: [],
+      goalies: [],
+      selection: []
     };
   }
   async componentDidMount() {
-    let {
-      data: {
+    let [
+      { data: players },
+      {
         data: {
-          player_stats: { goalies, skaters }
+          data: {
+            player_stats: { goalies }
+          }
         }
       }
-    } = await axios.get(
-      "https://d290qmen6zswb.cloudfront.net/web_player_table?league=nhl&season=2017&season_type=reg"
-    );
-    skaters = skaters
-      .map(skater => {
-        const value = Object.keys(pointMap).reduce((accum, field) => {
-          accum += skater[field] * pointMap[field];
-          return accum;
-        }, 0);
-        return { ...skater, value };
-      })
-      .sort((a, b) => desc(a, b, "value"));
+    ] = await Promise.all([
+      axios(
+        "https://us-central1-nhl-player-stats.cloudfunctions.net/api/players"
+      ),
+      axios(
+        "https://d290qmen6zswb.cloudfront.net/web_player_table?league=nhl&season=2017&season_type=reg"
+      )
+    ]);
+
     goalies = goalies
       .map(goalie => {
         const value = Object.keys(goaliePointMap).reduce((accum, field) => {
@@ -54,16 +58,52 @@ class App extends Component {
         return { ...goalie, value };
       })
       .sort((a, b) => desc(a, b, "value"));
+    players.sort((a, b) => desc(a, b, "value"));
 
-    this.setState({ goalies, skaters });
+    this.setState({ goalies, players });
   }
 
   handleChangeTab = (event, activeTab) => {
     this.setState({ activeTab });
   };
 
+  toggleSelection = (key, shift, row) => {
+    // start off with the existing state
+    let selection = [...this.state.selection];
+    const keyIndex = selection.indexOf(key);
+    // check to see if the key exists
+    if (keyIndex >= 0) {
+      // it does exist so we will remove it using destructing
+      selection = [
+        ...selection.slice(0, keyIndex),
+        ...selection.slice(keyIndex + 1)
+      ];
+    } else {
+      // it does not exist so add it
+      selection.push(key);
+    }
+    // update the state
+    this.setState({ selection });
+  };
+
+  isSelected = key => {
+    return this.state.selection.includes(key);
+  };
+
+  toggleAll = () => {
+    //
+  };
+
   render() {
-    const { activeTab, skaters, goalies } = this.state;
+    const { activeTab, players, goalies } = this.state;
+    const checkboxProps = {
+      keyField: 'playerId',
+      toggleAll: this.toggleAll,
+      selectAll: false,
+      isSelected: this.isSelected,
+      toggleSelection: this.toggleSelection,
+      selectType: "checkbox"
+    };
 
     return (
       <div>
@@ -72,10 +112,18 @@ class App extends Component {
           <Tab label="Goalies" />
         </Tabs>
         {activeTab == 0 ? (
-          <ReactTable columns={skaterColumns} data={skaters} />
+          <CheckboxTable
+            columns={skaterColumns}
+            data={players}
+            {...checkboxProps}
+          />
         ) : null}
         {activeTab == 1 ? (
-          <ReactTable columns={goalieColumns} data={goalies} />
+          <CheckboxTable
+            columns={goalieColumns}
+            data={goalies}
+            {...checkboxProps}
+          />
         ) : null}
       </div>
     );
@@ -84,25 +132,16 @@ class App extends Component {
 
 export default App;
 
-const pointMap = {
-  points: 3,
-  penalty_minutes: 0.5,
-  power_play_points: 1,
-  short_handed_goals: 1,
-  shots_on_goal: 0.5
-};
-
 const goaliePointMap = {
   wins: 3,
   goals_against: -1.5,
   saves: 0.5,
   shutouts: 4
 };
-
 const skaterColumns = [
   {
     id: "name",
-    accessor: "player_name_formatted",
+    accessor: "playerName",
     Header: "Name"
   },
   {
@@ -127,24 +166,24 @@ const skaterColumns = [
     Header: "Assists"
   },
   {
-    id: "PM",
-    accessor: "penalty_minutes",
-    Header: "Value"
+    id: "penalty_minutes",
+    accessor: "penaltyMinutes",
+    Header: "PM"
   },
   {
     id: "ppp",
-    accessor: "power_play_points",
+    accessor: "ppPoints",
     Header: "PPP"
   },
   {
     id: "shorthandedgoals",
-    accessor: "short_handed_goals",
+    accessor: "shGoals",
     Header: "Short handed G"
   },
   {
     id: "shotsongoal",
-    accessor: "shots_on_goal",
-    Header: "Shots on goal"
+    accessor: "shots",
+    Header: "Shots"
   }
 ];
 

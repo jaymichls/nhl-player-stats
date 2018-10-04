@@ -1,0 +1,25 @@
+const functions = require('firebase-functions');
+const admin = require('firebase-admin');
+admin.initializeApp();
+
+const app = require('./api');
+
+const pointMap = {
+	points: 3,
+	penalty_minutes: 0.5,
+	power_play_points: 1,
+	short_handed_goals: 1,
+	shots_on_goal: 0.5,
+};
+
+const goaliePointMap = {
+	wins: 3,
+	goals_against: -1.5,
+	saves: 0.5,
+	shutouts: 4,
+};
+
+// // Create and Deploy Your First Cloud Functions
+// // https://firebase.google.com/docs/functions/write-firebase-functions
+//
+exports.api = functions.https.onRequest(app);
